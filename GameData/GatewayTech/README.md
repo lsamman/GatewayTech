@@ -1,4 +1,4 @@
-# GatewayTech — Lunar Gateway parts for KSP
+# GatewayTech — Lunar Gateway parts for KSP (This is vibecoded beware)
 
 Kerbal Space Program 1.12.x parts for building NASA's Lunar Gateway station, in the style and scale of Benjee10's HabTech2. Every module is a separate part. Solar wings roll out, antennas and radiators deploy, and both robotic arms unfold. The docking-port spots are recessed seats that take HabTech-family NDS docking ports.
 
