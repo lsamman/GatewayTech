@@ -6,12 +6,14 @@ Kerbal Space Program 1.12.x parts for building NASA's Lunar Gateway station, in 
 
 | Part | Real module |
 |---|---|
-| GT-1 "Helios" Power & Propulsion Element | Gateway PPE (Maxar). Ion engine, probe core, SAS, folding dish antennas, two solar-wing mounts. |
+| GT-1 "Helios" Power & Propulsion Element | Gateway PPE (Maxar). Ion engine, probe core, SAS, folding dish antennas that turn to face HALO, two solar-wing mounts. |
 | GT-1W "Helios" Roll-Out Solar Wing | PPE roll-out solar array (ROSA) wing. Sun-tracking, retractable. |
 | GT-2 "Halo" Habitation & Logistics Outpost | HALO (Northrop Grumman). Command and control hub, main batteries, two dish antennas, 3 docking seats. |
-| GT-3 "Hestia" International Habitation Module | I-Hab (ESA / Thales Alenia Space / JAXA). Crew 3, 4 docking seats, accordion radiators. |
+| GT-3 "Hestia" International Habitation Module | I-Hab (ESA / Thales Alenia Space / JAXA). Crew 3, 4 docking seats, two radiator-wing mounts. |
+| GT-3R "Hestia" Accordion Radiator Wing | I-Hab radiator wing. Folds out zig-zag, retractable. |
 | GT-4 "Iris" Refuelling Module | ESPRIT Refuelling Module (ESA / Thales Alenia Space). Xenon and monopropellant, viewing windows. |
-| GT-5 "Portal" Crew & Science Airlock | Emirates Airlock (MBRSC / Thales Alenia Space). EVA airlock, accordion radiators. |
+| GT-5 "Portal" Crew & Science Airlock | Emirates Airlock (MBRSC / Thales Alenia Space). EVA airlock, two radiator-wing mounts. |
+| GT-5R "Portal" Folding Radiator Wing | Airlock radiator wing. Folds out zig-zag, retractable. |
 | GT-R1 "Long Reach" Station Arm | Canadarm3 large arm (MDA / CSA). Unfold/stow animation. |
 | GT-R2 "Fingertip" Dexterous Arm | Canadarm3 small dexterous arm (MDA / CSA). Extend/stow animation. |
 
@@ -32,7 +34,7 @@ Copy `GameData/GatewayTech` from the release zip into your KSP `GameData` folder
 ## Tips
 
 - Docking ports go on each seat's stack node, not surface-attached. They then sit at the depth the real ports do.
-- Put a GT-1W wing on each of the PPE's two wing nodes.
+- Put a GT-1W wing on each of the PPE's two wing nodes, a GT-3R wing on each of the I-Hab's `radA`/`radB` nodes, and a GT-5R wing on each of the Airlock's.
 - HALO and I-Hab each have an `arm` node where the real station's arms are mounted.
 
 ## Building from source

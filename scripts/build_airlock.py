@@ -1,4 +1,4 @@
-"""Crew & Science Airlock, with folding radiator wings.
+"""Crew & Science Airlock, with mounts for its radiator wings.
 blender -b src/gateway_source.blend -P scripts/build_airlock.py -- <outdir>"""
 import bpy, sys, os, json
 sys.path.insert(0, os.path.dirname(__file__))
@@ -17,12 +17,9 @@ for nm, (c, n) in {'top': ((11.97, 8.67, 0), (0, 1, 0)), 'bottom': ((11.97, 2.37
 
 body = P.piece('airlock_body', [(hull, None)])
 
-CLIP = 'radiatorDeploy'; N = 6 * G.FPS
-fc = G.face_centres(rad)
-for sgn, tag in ((1, 'A'), (-1, 'B')):
-    G.accordion(P, CLIP, f'radiator{tag}', rad, span_st=(0, 0, sgn), hinge_axis_st=(1, 0, 0),
-                cuts=[4.44, 6.405, 8.375], root_lo=None, tip_hi=None, thick_dir_st=(0, 1, 0),
-                half_thick=0.055, n_frames=N, mask=fc[:, 2] * sgn > 0)
+# radiator wing mounts: the wings are a separate part (gt_AirlockRadiator, build_radiator.py)
+for w, tag in ((1, 'radA'), (-1, 'radB')):
+    P.node(tag, P.p(G.wing_root(rad, w)), P.d((0, 0, w)), 1)
 
 G.airlock(P, body, (0, -1, 0), 0.0)
 P.assign_ksp_materials({})
@@ -33,5 +30,5 @@ P.hull_collider('collider_body', co[r < 1.15][::5])
 P.bake_clips(0)
 P.export(os.path.join(out, 'gt_Airlock.mu'))
 json.dump({'nodes': {k: [list(v[0]), list(v[1]), v[2]] for k, v in P.nodes.items()},
-           'clips': {CLIP: N}}, open(os.path.join(out, 'gt_Airlock.json'), 'w'), indent=1)
+           'clips': {}}, open(os.path.join(out, 'gt_Airlock.json'), 'w'), indent=1)
 bpy.ops.wm.save_as_mainfile(filepath=os.path.join(out, 'gt_Airlock.blend'))

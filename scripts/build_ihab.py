@@ -1,4 +1,4 @@
-"""I-Hab: International Habitation module, with folding radiator wings.
+"""I-Hab: International Habitation module, with mounts for its radiator wings.
 blender -b src/gateway_source.blend -P scripts/build_ihab.py -- <outdir>"""
 import bpy, sys, os, json
 sys.path.insert(0, os.path.dirname(__file__))
@@ -27,14 +27,10 @@ P.node('arm', P.p(apos), P.d(adir), 0)
 
 body = P.piece('ihab_body', [(hull, None)])
 
-# radiator wings: span +/-Z, panels hinge about station X, thin along Y
-CLIP = 'radiatorDeploy'; N = 6 * G.FPS
-fc = G.face_centres(rad)
-for sgn, tag in ((1, 'A'), (-1, 'B')):
-    mask = fc[:, 2] * sgn > 0
-    G.accordion(P, CLIP, f'radiator{tag}', rad, span_st=(0, 0, sgn), hinge_axis_st=(1, 0, 0),
-                cuts=[4.355, 6.605, 8.855], root_lo=None, tip_hi=None, thick_dir_st=(0, 1, 0),
-                half_thick=0.12, n_frames=N, mask=mask)
+# radiator wing mounts: the accordion wings are a separate part (gt_IHabRadiator,
+# build_radiator.py) that stacks onto these nodes at the root of each wing
+for w, tag in ((1, 'radA'), (-1, 'radB')):
+    P.node(tag, P.p(G.wing_root(rad, w)), P.d((0, 0, w)), 1)
 
 G.airlock(P, body, (0, -1, 0), -0.6)
 P.assign_ksp_materials({'iHab_main': 'iHAB_main', 'iHab_aux': 'iHAB_aux'})
@@ -45,5 +41,5 @@ P.hull_collider('collider_body', co[r < 1.3][::5])
 P.bake_clips(0)
 P.export(os.path.join(out, 'gt_IHab.mu'))
 json.dump({'nodes': {k: [list(v[0]), list(v[1]), v[2]] for k, v in P.nodes.items()},
-           'clips': {CLIP: N}}, open(os.path.join(out, 'gt_IHab.json'), 'w'), indent=1)
+           'clips': {}}, open(os.path.join(out, 'gt_IHab.json'), 'w'), indent=1)
 bpy.ops.wm.save_as_mainfile(filepath=os.path.join(out, 'gt_IHab.blend'))

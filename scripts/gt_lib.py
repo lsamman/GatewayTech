@@ -445,6 +445,14 @@ def accordion(part, clip, name, src, span_st, hinge_axis_st, cuts, root_lo, tip_
     return panels
 
 
+def wing_root(o, w):
+    """Station-space root point of the radiator wing of `o` on the station +Z (w=1) or -Z (w=-1)
+    side: centre of the wing's footprint, at its innermost Z."""
+    v = world_verts(o)
+    v = v[v[:, 2] * w > 0]
+    return ((v[:, 0].min() + v[:, 0].max()) / 2, (v[:, 1].min() + v[:, 1].max()) / 2, w * np.abs(v[:, 2]).min())
+
+
 def airlock(part, body, direction, z, size=0.6):
     """EVA hatch trigger: box collider tagged 'Airlock' just outside the hull on `direction`."""
     d = Vector(direction).normalized()

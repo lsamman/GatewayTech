@@ -97,6 +97,14 @@ SOLAR = """\
 	}}
 """
 
+CARGO = """\
+	MODULE
+	{{
+		name = ModuleCargoPart
+		packedVolume = {vol}
+	}}
+"""
+
 CREW = """\
 	CrewCapacity = {crew}
 	INTERNAL
@@ -131,9 +139,11 @@ def res(name, amount, maxa=None):
 #   PPE      5,000 kg launch (NASA): ~2,300 dry + 2,500 Xe + ~200 N2H4  -> 0.575 t dry, of which
 #            two ROSA wings ~600 kg each (estimate)                       -> bus 0.275 t + 2 x gt_ROSA 0.15 t
 #   HALO     no published mass; ~8,000 kg estimated (enlarged Cygnus PCM)  -> 2.0 t
-#   I-Hab    10,000 kg (ESA)                                                -> 2.5 t
+#   I-Hab    10,000 kg (ESA)                                                -> 2.5 t, of which
+#            two accordion radiator wings ~400 kg each (estimate)        -> 2.3 t + 2 x gt_IHabRadiator 0.1 t
 #   ESPRIT   10,000 kg (ESA): ~2,000 Xe + ~800 N2H4 refuelling load      -> 1.8 t + 5000 Xe + 50 MP
-#   Airlock  10,000 kg (MBRSC / Thales Alenia)                             -> 2.5 t
+#   Airlock  10,000 kg (MBRSC / Thales Alenia)                             -> 2.5 t, of which
+#            two radiator wings ~200 kg each (estimate)                   -> 2.4 t + 2 x gt_AirlockRadiator 0.05 t
 #   Canadarm3 large arm 715 kg (CSA)                                        -> 0.18 t
 #   Dexterous arm ~360 kg (CSA system estimate 1,076 kg minus large arm)   -> 0.09 t
 MASS_SCALE = 0.25
@@ -253,11 +263,17 @@ PARTS = {
 """ + res('ElectricCharge', 2000)),
     'gt_IHab': dict(
         title='GT-3 "Hestia" International Habitation Module',
-        description='Lunar Gateway International Habitation Module (I-Hab), built by ESA and Thales Alenia Space with JAXA. The outpost\'s main living space, with four recessed docking seats and a pair of accordion radiators that fold out to dump the heat of a busy crew.',
-        tech='spaceExploration', cost=12500, entry=16000, mass=2.5, category='Utility',
+        description='Lunar Gateway International Habitation Module (I-Hab), built by ESA and Thales Alenia Space with JAXA. The outpost\'s main living space, with four recessed docking seats and two mounts for GT-3R accordion radiator wings to dump the heat of a busy crew.',
+        tech='spaceExploration', cost=10500, entry=16000, mass=2.3, category='Utility',
         profiles='size2, size1', attach='1,0,1,1,0', tags='gateway lunar station ihab habitation module radiator',
-        extra=CREW.format(crew=3, iva='ht2_destinyIVA', slots=6)
-        + RADIATOR.format(pivot='radiatorA_p0', energy=60000, ec=0.6)),
+        extra=CREW.format(crew=3, iva='ht2_destinyIVA', slots=6)),
+    'gt_IHabRadiator': dict(
+        title='GT-3R "Hestia" Accordion Radiator Wing',
+        description='One of the I-Hab\'s two accordion radiator wings: four panels that fold out zig-zag to dump the heat of a busy crew. Fits the I-Hab radiator mounts, or any surface.',
+        tech='spaceExploration', cost=1000, entry=6000, mass=0.1, category='Thermal',
+        profiles='srf', attach='1,1,0,0,0', tags='gateway lunar station ihab radiator accordion wing thermal heat',
+        node_attach='0.0, 0.0, 0.0, 0.0, -1.0, 0.0',
+        extra=RADIATOR.format(pivot='radiator_p0', energy=30000, ec=0.3) + CARGO.format(vol=300)),
     'gt_ESPRIT': dict(
         title='GT-4 "Iris" Refuelling Module',
         description='Lunar Gateway ESPRIT Refuelling Module (European System Providing Refuelling, Infrastructure and Telecommunications), built by ESA and Thales Alenia Space. A refuelling tank farm topped with a ring of viewing windows; carries xenon and hydrazine (monopropellant) to top up the Power and Propulsion Element.',
@@ -267,11 +283,17 @@ PARTS = {
         + res('XenonGas', 5000) + res('MonoPropellant', 50)),
     'gt_Airlock': dict(
         title='GT-5 "Portal" Crew & Science Airlock',
-        description='Lunar Gateway Crew and Science Airlock, the UAE\'s Emirates Airlock built by MBRSC and Thales Alenia Space. An EVA airlock for crew and small science payloads, with folding radiator wings of its own.',
-        tech='spaceExploration', cost=8200, entry=12000, mass=2.5, category='Utility',
+        description='Lunar Gateway Crew and Science Airlock, the UAE\'s Emirates Airlock built by MBRSC and Thales Alenia Space. An EVA airlock for crew and small science payloads, with two mounts for GT-5R folding radiator wings.',
+        tech='spaceExploration', cost=7200, entry=12000, mass=2.4, category='Utility',
         profiles='size1p5, size1', attach='1,0,1,1,0', tags='gateway lunar station airlock eva radiator',
-        extra=CREW.format(crew=2, iva='ht2_questIVA', slots=4)
-        + RADIATOR.format(pivot='radiatorA_p0', energy=35000, ec=0.4)),
+        extra=CREW.format(crew=2, iva='ht2_questIVA', slots=4)),
+    'gt_AirlockRadiator': dict(
+        title='GT-5R "Portal" Folding Radiator Wing',
+        description='One of the Crew and Science Airlock\'s two folding radiator wings. Fits the Airlock radiator mounts, or any surface.',
+        tech='spaceExploration', cost=500, entry=4000, mass=0.05, category='Thermal',
+        profiles='srf', attach='1,1,0,0,0', tags='gateway lunar station airlock radiator wing thermal heat',
+        node_attach='0.0, 0.0, 0.0, 0.0, -1.0, 0.0',
+        extra=RADIATOR.format(pivot='radiator_p0', energy=17500, ec=0.2) + CARGO.format(vol=150)),
     'gt_Canadarm3': dict(
         title='GT-R1 "Long Reach" Station Arm',
         description='Lunar Gateway Canadarm3 large arm, built by MDA for the Canadian Space Agency. An 8.5 m two-boom station arm; its joints are ornamental, and it unfolds from its stowed position on command.',

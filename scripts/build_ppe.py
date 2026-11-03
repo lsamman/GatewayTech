@@ -18,7 +18,10 @@ xs = G.world_verts(hull)[:, 0]
 P.node('top', P.p((0.0, 0, 0)), P.d((1, 0, 0)), 2)
 P.node('bottom', P.p((xs.min(), 0, 0)), P.d((-1, 0, 0)), 2)
 
-# --- antennas: one boom + two dishes per side; fold aft along the bus -----------
+# --- antennas: one boom + a two-dish platform per side ---------------------------
+# The boom folds aft along the bus. In the model the dishes look along station +Z, straight
+# at a solar wing; deploying tips the platform 90 deg about its boom link so both dishes
+# look along +X, at HALO.
 ANT = 'antennaDeploy'; NA = 5 * G.FPS
 ants = []
 for s, tag in ((1, 'L'), (-1, 'R')):
@@ -30,16 +33,29 @@ for s, tag in ((1, 'L'), (-1, 'R')):
     mask = G.island_select(hull, pred, max_size=2.3) & (labels != main_isl)
     pts = fc[mask]
     hinge_st = pts[np.argmin(np.abs(pts[:, 1]))]
+    # dish head: the islands outboard of the boom's elbow (link stub, platform, dishes, feeds)
+    isl = np.unique(labels[mask])
+    out_y = {i: fc[labels == i, 1].mean() * s for i in isl}
+    head_isl = [i for i in isl if out_y[i] > 2.5]
+    head = np.isin(labels, head_isl)
+    link = fc[labels == min(head_isl, key=out_y.get)]
+    piv_st = (link.min(0) + link.max(0)) / 2      # the link stub runs along station Y
     fr = G.frame_from_axes(P.p(hinge_st), z=(0, 0, 1), x=(1, 0, 0))
-    a = P.piece(f'antenna{tag}', [(hull, mask)], fr)
+    a = P.piece(f'antenna{tag}', [(hull, mask & ~head)], fr)
+    d = P.piece(f'dish{tag}', [(hull, head)], G.frame_from_axes(P.p(piv_st), z=(0, 0, 1), x=(1, 0, 0)), a)
     G.remove_faces(hull, mask)
     ax = P.d((0, 0, 1))                      # station Z (vertical) in part space
     stow = Quaternion(ax, math.radians(90 * s))
     P.key(ANT, a, 0, rotation_quaternion=stow)
-    P.key(ANT, a, NA // 2, rotation_quaternion=Quaternion(ax, math.radians(45 * s)))
+    P.key(ANT, a, int(NA * 0.3), rotation_quaternion=Quaternion(ax, math.radians(45 * s)))
+    P.key(ANT, a, int(NA * 0.6), rotation_quaternion=Quaternion())
     P.key(ANT, a, NA, rotation_quaternion=Quaternion())
+    # +90 deg about station Y turns the dish boresight from station +Z to +X
+    P.key(ANT, d, 0, rotation_quaternion=Quaternion())
+    P.key(ANT, d, int(NA * 0.5), rotation_quaternion=Quaternion())
+    P.key(ANT, d, NA, rotation_quaternion=Quaternion(P.d((0, 1, 0)), math.radians(90)))
     ants.append(a)
-    print(f"antenna {tag}: {mask.sum()} faces hinge {np.round(hinge_st, 3)}")
+    print(f"antenna {tag}: {mask.sum()} faces hinge {np.round(hinge_st, 3)} dish pivot {np.round(piv_st, 3)}")
 
 body = P.piece('ppe_body', [(hull, None)])
 
