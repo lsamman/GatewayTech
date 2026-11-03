@@ -1,0 +1,6 @@
+build/
+src/
+tools/io_object_mu/
+release/
+*.blend1
+__pycache__/

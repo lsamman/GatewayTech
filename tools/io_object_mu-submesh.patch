@@ -1,0 +1,23 @@
+diff --git a/export_mu/mesh.py b/export_mu/mesh.py
+index 1571ecf..ba8002e 100644
+--- a/export_mu/mesh.py
++++ b/export_mu/mesh.py
+@@ -40,11 +40,13 @@ Matrix_YZ = Matrix(((1,0,0,0),
+ MU_MAX_VERTS = 65534
+ 
+ def build_submeshes(mesh):
+-    submeshes = []
+-    submesh = []
+-    for i in range(len(mesh.loop_triangles)):
+-        submesh.append(i)
+-    submeshes.append(submesh)
++    # GatewayTech patch: one submesh per material slot, so each renderer
++    # material draws only its own faces (upstream put every triangle in one
++    # submesh, making Unity draw the whole mesh once per material).
++    count = max(1, len(mesh.materials))
++    submeshes = [[] for _ in range(count)]
++    for i, tri in enumerate(mesh.loop_triangles):
++        submeshes[min(tri.material_index, count - 1)].append(i)
+     return submeshes
+ 
+ def make_tris(mesh, submeshes, vertex_map):
