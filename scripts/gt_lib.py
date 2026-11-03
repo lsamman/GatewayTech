@@ -310,7 +310,7 @@ def port_cap(part, hull_obj, centre_st, axis_st, r_search=1.15, name='cap'):
     rad = np.linalg.norm(rel - np.outer(t, n_st), axis=1)
     wall = (np.abs(t - t_base) < 0.15) & (rad > 0.4) & (rad < 1.4)
     bore = rad[wall].min() if wall.any() else 0.8
-    r_floor = (bore + 0.04) * SCALE
+    r_floor = (bore + 0.07) * SCALE          # edge tucks into the bore wall, closing any hairline gap
     # collar top: highest hull point around the opening (lip of the docking collar)
     near = (rad < 1.15) & (t > t_base - 0.2) & (t < 0.8)
     t_top = max(t[near].max(), t_base + 0.06) if near.any() else t_base + 0.1
@@ -322,12 +322,6 @@ def port_cap(part, hull_obj, centre_st, axis_st, r_search=1.15, name='cap'):
     # floor disc
     bmesh.ops.create_cone(bm, cap_ends=True, cap_tris=False, segments=48, radius1=r_floor, radius2=r_floor, depth=depth)
     bmesh.ops.translate(bm, verts=bm.verts, vec=(0, 0, -depth / 2 - 0.002))
-    # liner tube just inside the bore, floor -> collar lip, so no gap shows round the seat
-    r_lin = (bore - 0.01) * SCALE
-    h_lin = (t_top - t_base) * SCALE
-    if h_lin > 0.02:
-        g = bmesh.ops.create_cone(bm, cap_ends=False, cap_tris=False, segments=48, radius1=r_lin, radius2=r_lin, depth=h_lin + 0.01)
-        bmesh.ops.translate(bm, verts=g['verts'], vec=(0, 0, h_lin / 2 - 0.005))
     uv = bm.loops.layers.uv.new('UVMap')
     for f in bm.faces:
         for l in f.loops:
