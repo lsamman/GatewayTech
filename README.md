@@ -2,6 +2,8 @@
 
 Kerbal Space Program 1.12.x parts for building NASA's Lunar Gateway station, in the style and scale of Benjee10's HabTech2. Every module is a separate part. Solar wings roll out, antennas and radiators deploy, and both robotic arms unfold. The docking-port spots are recessed seats that take HabTech-family NDS docking ports.
 
+(I needed gateway modules for a project so I took the easy route, expect rough models, issues, etc)
+
 ## Parts
 
 | Part | Real module |
