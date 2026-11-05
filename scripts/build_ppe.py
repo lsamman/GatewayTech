@@ -59,11 +59,16 @@ for s, tag in ((1, 'L'), (-1, 'R')):
 
 body = P.piece('ppe_body', [(hull, None)])
 
-# --- thrusters (Hall-effect, on the aft booms) -----------------------------------
-for s, tag in ((1, 'L'), (-1, 'R')):
-    tp = P.p((-5.05, 2.3 * s, 0.0))
-    # io_object_mu turns a thrustTransform's local +Z into Unity forward (exhaust direction)
-    P.empty('thrustTransform', G.frame_from_axes(tp, z=P.d((-1, 0, 0)), x=P.d((0, 1, 0))), P.model)
+# --- thrusters: 3 large Hall thrusters (AEPS) on the aft face, 2 smaller ones (BHT-6000) on
+# each boom; points are the centres of each nozzle's exit face -------------------------
+for plume, pts in (('plumeLarge', [(-5.463, y, 0.0) for y in (-1.043, 0.0, 1.043)]),
+                   ('plumeSmall', [(-4.996, y, 0.0) for y in (-2.391, -1.975, 1.975, 2.391)])):
+    for pt in pts:
+        # io_object_mu turns a thrustTransform's local +Z into Unity forward (exhaust direction)
+        fr = G.frame_from_axes(P.p(pt), z=P.d((-1, 0, 0)), x=P.d((0, 1, 0)))
+        t = P.empty('thrustTransform', fr, P.model)
+        # child at identity inherits that forward; the part cfg picks plume size by this name
+        P.empty(plume, fr, t)
 
 # --- solar wing mounts: the roll-out wings are a separate part (gt_ROSA, build_rosa.py)
 # that stacks onto these nodes at the base of each yoke ----------------------------
