@@ -131,8 +131,39 @@ Never edit animated parts (arms, wings, radiators, antennas, chutes, HIAD, legs)
 - GatewayTech: the generator's output for one part matches the hand-edited cfg.
 - In-game check in KSP on the owner's machine.
 
-## State when this file was written
-Branch `claude/bdb-upgrade` exists in both repos, at main, with only this file added. No texture,
-cfg or model change has been made yet. Planned worktrees: `gt-tex` (A, Opus), `gt-emit` (B, Opus),
-`gt-cfg` (C, Sonnet), `sh-cfg` (C, Sonnet); ShabTech texture wiring after A; this file updated at
-the end. One PR per repo; merge on the owner's say-so.
+## State (updated 2026-11-11, Fable 5.1 session, owner's machine)
+
+Corrections to the facts above, found on the owner's machine: Blender 3.6 + io_object_mu and the gitignored
+`build/`, `src/` are present, so material changes go through `gt_lib.py` + `build_all.sh` (the `mu.py`
+byte-patching route is not needed). ShabTech's cfg source of truth is `cfg/` + `patches/`; `build_all.sh`
+deletes and regenerates `GameData/SHABTech` (`SKIP_MODELS=1 SKIP_TEX=1 ./build_all.sh` for cfg-only
+changes; it also deletes the tracked `Parts/@thumbs/`, restore with `git checkout`). ImageMagick is v7
+(`magick`). Bluedog is installed in the Sol KSP GameData (`Bluedog_DB`), so it can be measured locally.
+
+**Done, reviewed by Fable, merged into `claude/bdb-upgrade` in both repos (local only, NOT pushed):**
+- C (both repos): all config items above. PPE bus = 0.95 t (0.25 × 5 t − 2 × 0.15 t ROSA), MonoPropellant
+  dropped (no RCS transforms). PCM shutters keep plain `Open/Close/Toggle Shutters` (`#autoLOC_600240x`
+  contain `<<1>>` and only work on ModuleDeployableRadiator). GatewayTech Agency logo is a placeholder
+  (`gt_white_diff`); a real flag is still to be made. `scripts/lint.py` now exists in GatewayTech too.
+- B: `scripts/emit.py` + `gt_lib.material()` switch to `KSP/Emissive/Bumped Specular` when
+  `build/tex/<mat>_emit.dds` exists; `build_all.sh` runs emit.py first. Only ESPRIT (ERMXL_main/aux) has
+  window glass in the source atlases; HALO_main's map lights its camera/lamp lenses; I-Hab and Airlock have
+  no glass texels, so they keep the plain shader and got NO ModuleColorChanger (HALO and ESPRIT have it).
+  Rebuilt `gt_HALO.mu`, `gt_ESPRIT.mu`; clips verified intact.
+
+**A (textures): pilot approved by the owner on 2026-11-11 ("batch both as piloted").** The batch was running
+in worktrees `~/Projects/wt/gt-tex` (branch `wt/gt-tex`) and `~/Projects/wt/sh-tex` (`wt/sh-tex`) when the PC
+was restarted; everything there is uncommitted. `scripts/bdb_look.py` (identical in both), `textures.py`
+gains 1.0/1.1/0.20, processed DDS in each worktree's `build/tex` (originals in `build/pilot/orig/`,
+pilot renders and `check.txt` in `build/pilot/`). Pilot numbers: HALO_main crease −.123→−.051, normal std
+.157→.100; shab_fib crease −.093→−.050; p90/warmth/gloss unchanged. Spec notes from the pilot: the crease
+metric is a 9 px *radius* box; gains alone give HALO normal std .136, so `textures.py` must call
+`bdb_look.scale_normal()` and `look()`; ShabTech has no uvdump, so no island-edge term there.
+Remaining for A: finish the batch (GT: 11 materials diff+nrm with `--uvdump --nstd .10 --emit`; SH: diff
+only for fib, mmod, lander, hiad, isru, rover, sm, surface, tps, details, fan), copy to GameData, wire
+`textures.py` and `tl.py` with proof runs, renders of gt_IHab and shab_Lander, `--check` on every map.
+
+**Then:** Fable reviews, commits on `wt/*`, merges into `claude/bdb-upgrade`, runs lint on both trees,
+`./deploy.sh` both for the owner's in-game check, pushes, opens one PR per repo, updates this file.
+Merge to main only on the owner's say-so. D (geometry) not started; the owner should judge the batched
+textures in game first.
