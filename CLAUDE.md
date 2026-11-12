@@ -151,17 +151,16 @@ changes; it also deletes the tracked `Parts/@thumbs/`, restore with `git checkou
   no glass texels, so they keep the plain shader and got NO ModuleColorChanger (HALO and ESPRIT have it).
   Rebuilt `gt_HALO.mu`, `gt_ESPRIT.mu`; clips verified intact.
 
-**A (textures): pilot approved by the owner on 2026-11-11 ("batch both as piloted").** The batch was running
-in worktrees `~/Projects/wt/gt-tex` (branch `wt/gt-tex`) and `~/Projects/wt/sh-tex` (`wt/sh-tex`) when the PC
-was restarted; everything there is uncommitted. `scripts/bdb_look.py` (identical in both), `textures.py`
-gains 1.0/1.1/0.20, processed DDS in each worktree's `build/tex` (originals in `build/pilot/orig/`,
-pilot renders and `check.txt` in `build/pilot/`). Pilot numbers: HALO_main crease −.123→−.051, normal std
-.157→.100; shab_fib crease −.093→−.050; p90/warmth/gloss unchanged. Spec notes from the pilot: the crease
-metric is a 9 px *radius* box; gains alone give HALO normal std .136, so `textures.py` must call
-`bdb_look.scale_normal()` and `look()`; ShabTech has no uvdump, so no island-edge term there.
-Remaining for A: finish the batch (GT: 11 materials diff+nrm with `--uvdump --nstd .10 --emit`; SH: diff
-only for fib, mmod, lander, hiad, isru, rover, sm, surface, tps, details, fan), copy to GameData, wire
-`textures.py` and `tl.py` with proof runs, renders of gt_IHab and shab_Lander, `--check` on every map.
+**A (textures): pilot approved by the owner on 2026-11-11 ("batch both as piloted"); batch DONE and committed
+as unreviewed snapshots** on `wt/gt-tex` and `wt/sh-tex` (worktrees `~/Projects/wt/gt-tex`, `~/Projects/wt/sh-tex`;
+not merged, not pushed). 20 of 22 maps pass `--check` (all 11 GT materials at crease ≈ −.05, normal std .100;
+p90/warmth/gloss unchanged everywhere). `shab_isru` (−.006) and `shab_rover` (−.022) miss the crease target:
+flat paint, nothing to soften; Fable recommends exempting them. ShabTech is measured on UV-covered paint only
+(`bdb_look.py --dump-uv` writes `build/uvdump.json`; `--measure-cover`); maps softer than −.04 get island-edge
+darkening up to 15%. Generators are wired and proven: `textures.py` (gains 1.0/1.1/0.20, `GLOSS_CAVITY` .30,
+calls `look()` + `scale_normal()`), `tl.py` (`HULL` tuple, `bdb_pass()` in `Canvas.save()`). Originals in each
+worktree's `build/pilot/orig/`; tables in `build/pilot/batch_check.txt`; renders `IHab_after.png`, `Lander_after.png`.
+Remaining for A: Fable's review of the two snapshot commits, isru/rover decision, then merge.
 
 **Then:** Fable reviews, commits on `wt/*`, merges into `claude/bdb-upgrade`, runs lint on both trees,
 `./deploy.sh` both for the owner's in-game check, pushes, opens one PR per repo, updates this file.
