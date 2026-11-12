@@ -15,6 +15,7 @@ from mathutils import Matrix, Vector, Quaternion
 
 SCALE = 0.585            # HabTech2 Destiny: 2.5 m hull / 4.27 m real
 FPS = 30
+TEXDIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'build', 'tex')  # emit maps (emit.py)
 # station -> part rotations
 R_AXIAL = Matrix(((0, 1, 0), (0, 0, 1), (1, 0, 0)))    # station +X -> part +Z
 R_RADIAL = Matrix(((0, 0, 1), (1, 0, 0), (0, 1, 0)))   # station +Y -> part +Z
@@ -143,13 +144,22 @@ class Part:
         tex = tex or src_name
         m = bpy.data.materials.new('gt_' + src_name)
         mp = m.mumatprop
-        mp.shaderName = 'KSP/Bumped Specular'
+        # window materials (scripts/emit.py wrote <tex>_emit.dds) glow; ModuleColorChanger
+        # drives _EmissiveColor, which starts black so the windows are dark until switched on
+        emit = os.path.exists(os.path.join(TEXDIR, f'{tex}_emit.dds'))
+        mp.shaderName = 'KSP/Emissive/Bumped Specular' if emit else 'KSP/Bumped Specular'
         # HabTech .mu files reference textures as '<name>.png' even though the files are .dds
-        for nm, t, isn in (('_MainTex', f'{tex}_diff.png', False), ('_BumpMap', (f'{tex}_nrm' if not tex.startswith('gt_') else 'gt_flat_nrm') + '.png', True)):
+        texs = [('_MainTex', f'{tex}_diff.png'), ('_BumpMap', (f'{tex}_nrm' if not tex.startswith('gt_') else 'gt_flat_nrm') + '.png')]
+        if emit:
+            texs.append(('_Emissive', f'{tex}_emit.png'))
+        for nm, t in texs:
             it = mp.texture.properties.add(); it.name = nm; it.tex = t; it.type = False
             it.scale = (1, 1); it.offset = (0, 0)
-        for nm, v in (('_Color', (1, 1, 1, 1)), ('_SpecColor', (spec, spec, spec, 1)), ('_RimColor', (0, 0, 0, 0)),
-                      ('_TemperatureColor', (0, 0, 0, 0)), ('_BurnColor', (1, 1, 1, 1))):
+        cols = [('_Color', (1, 1, 1, 1)), ('_SpecColor', (spec, spec, spec, 1)), ('_RimColor', (0, 0, 0, 0)),
+                ('_TemperatureColor', (0, 0, 0, 0)), ('_BurnColor', (1, 1, 1, 1))]
+        if emit:
+            cols.append(('_EmissiveColor', (0, 0, 0, 1)))
+        for nm, v in cols:
             it = mp.color.properties.add(); it.name = nm; it.value = v
         for nm, v in (('_Shininess', shininess), ('_Opacity', 1.0), ('_RimFalloff', 0.1)):
             it = mp.float3.properties.add(); it.name = nm; it.value = v
