@@ -131,7 +131,7 @@ Never edit animated parts (arms, wings, radiators, antennas, chutes, HIAD, legs)
 - GatewayTech: the generator's output for one part matches the hand-edited cfg.
 - In-game check in KSP on the owner's machine.
 
-## State (updated 2026-11-11, Fable 5.1 session, owner's machine)
+## State (updated 2026-11-12, Fable 5.1 session, owner's machine)
 
 Corrections to the facts above, found on the owner's machine: Blender 3.6 + io_object_mu and the gitignored
 `build/`, `src/` are present, so material changes go through `gt_lib.py` + `build_all.sh` (the `mu.py`
@@ -151,18 +151,18 @@ changes; it also deletes the tracked `Parts/@thumbs/`, restore with `git checkou
   no glass texels, so they keep the plain shader and got NO ModuleColorChanger (HALO and ESPRIT have it).
   Rebuilt `gt_HALO.mu`, `gt_ESPRIT.mu`; clips verified intact.
 
-**A (textures): pilot approved by the owner on 2026-11-11 ("batch both as piloted"); batch DONE and committed
-as unreviewed snapshots** on `wt/gt-tex` and `wt/sh-tex` (worktrees `~/Projects/wt/gt-tex`, `~/Projects/wt/sh-tex`;
-not merged, not pushed). 20 of 22 maps pass `--check` (all 11 GT materials at crease ≈ −.05, normal std .100;
-p90/warmth/gloss unchanged everywhere). `shab_isru` (−.006) and `shab_rover` (−.022) miss the crease target:
-flat paint, nothing to soften; Fable recommends exempting them. ShabTech is measured on UV-covered paint only
-(`bdb_look.py --dump-uv` writes `build/uvdump.json`; `--measure-cover`); maps softer than −.04 get island-edge
-darkening up to 15%. Generators are wired and proven: `textures.py` (gains 1.0/1.1/0.20, `GLOSS_CAVITY` .30,
-calls `look()` + `scale_normal()`), `tl.py` (`HULL` tuple, `bdb_pass()` in `Canvas.save()`). Originals in each
-worktree's `build/pilot/orig/`; tables in `build/pilot/batch_check.txt`; renders `IHab_after.png`, `Lander_after.png`.
-Remaining for A: Fable's review of the two snapshot commits, isru/rover decision, then merge.
+**A (textures): DONE, reviewed by Fable and merged into `claude/bdb-upgrade` in both repos on 2026-11-12**
+(merge commits "Merge wt/gt-tex" / "Merge wt/sh-tex"; local only, NOT pushed). `scripts/bdb_look.py` is the same file in
+both repos. 20 of 22 maps pass `--check` (all 11 GT materials at crease ≈ −.05, normal std .100; p90/warmth/gloss
+unchanged everywhere). `shab_isru` (−.006) and `shab_rover` (−.022) are exempt from the crease target: flat paint
+with nothing to soften, they got the maximum contact shading and stay as processed. ShabTech is measured on
+UV-covered paint only (`bdb_look.py --dump-uv` writes `build/uvdump.json`; `--measure-cover`); maps softer than −.04
+get island-edge darkening up to 15%. Generators are wired and proven: `textures.py` (gains 1.0/1.1/0.20,
+`GLOSS_CAVITY` .30, calls `look()` + `scale_normal()`), `tl.py` (`HULL` tuple, `bdb_pass()` in `Canvas.save()`).
+The merged DDS were copied into each main checkout's `build/tex`, so `build_all.sh` reuses them. Lint: 0 errors in
+both trees. Both mods deployed to the Sol install with `./deploy.sh` for the owner's in-game check. The worktrees
+`~/Projects/wt/gt-tex` and `sh-tex` still hold the originals (`build/pilot/orig/`), tables (`batch_check.txt`) and
+renders; `git worktree remove` them once the owner has judged the textures in game.
 
-**Then:** Fable reviews, commits on `wt/*`, merges into `claude/bdb-upgrade`, runs lint on both trees,
-`./deploy.sh` both for the owner's in-game check, pushes, opens one PR per repo, updates this file.
-Merge to main only on the owner's say-so. D (geometry) not started; the owner should judge the batched
-textures in game first.
+**Next, in order:** owner judges the batched textures in game → push `claude/bdb-upgrade` in both repos, one PR
+per repo → merge to main only on the owner's say-so. D (geometry) not started.
