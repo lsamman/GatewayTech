@@ -2,13 +2,19 @@
 
   <mat>_diff.dds : RGB = base colour (metal darkened slightly), A = gloss (1 - roughness)   DXT5
   <mat>_nrm.dds  : DXT5nm (R=1, G=Y, B=Y, A=X)                                            DXT5
-usage: python3 -I textures.py <tex_src dir> <out dir>
+Every map then gets the Bluedog-style look pass (scripts/bdb_look.py): normals scaled to an
+A-channel std of NORMAL_STD, relief softened to the crease target, broad occlusion and grime;
+texels lit in <mat>_emit.dds (out dir, else build/tex) are left alone.
+usage: python3 -I textures.py <tex_src dir> <out dir> [mat ...]     (mats: default all)
 """
 import os, subprocess, sys
 import numpy as np
 from PIL import Image, ImageDraw
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import bdb_look
 
 src, out = sys.argv[1], sys.argv[2]
+ONLY = set(sys.argv[3:])
 os.makedirs(out, exist_ok=True)
 tmp = os.path.join(out, '_png'); os.makedirs(tmp, exist_ok=True)
 
@@ -25,13 +31,17 @@ def load(name):
     return np.asarray(Image.open(p).convert('RGBA')).astype(np.float32) / 255 if os.path.exists(p) else None
 
 mats = sorted({f.rsplit('_', 1)[0] for f in os.listdir(src) if f.endswith('_BaseColor.png')})
+mats = [m for m in mats if not ONLY or m in ONLY]
 # Calibrated to HabTech2's own maps (its white USOS panels: diffuse p90 ~0.78, gloss mean ~0.3)
 # so Gateway parts sit next to HabTech parts under the same stock KSP/Bumped Specular shader.
 TARGET_P90 = 0.78
-NORMAL_GAIN = 1.5      # strengthen the model's own normal map
-DETAIL_GAIN = 2.0      # relief derived from the colour map (panel seams, rivets, MLI creases)
-CAVITY_GAIN = 0.30     # darken grooves / lighten edges from normal-map curvature
+NORMAL_GAIN = 1.0      # the model's own normal map as authored (was 1.5; Bluedog-style softer relief)
+DETAIL_GAIN = 1.1      # relief derived from the colour map (panel seams, rivets, MLI creases)
+CAVITY_GAIN = 0.20     # darken grooves / lighten edges from normal-map curvature
+GLOSS_CAVITY = 0.30    # the same curvature's pull on gloss (the pre-Bluedog CAVITY_GAIN, unchanged)
+NORMAL_STD = 0.10      # DXT5nm A-channel std after the look pass (Bluedog .09-.11)
 UVDUMP = os.path.join(os.path.dirname(os.path.abspath(sys.argv[1])), 'uvdump.json')
+EMIT_DIRS = (out, os.path.join(os.path.dirname(os.path.abspath(sys.argv[1])), 'tex'))
 
 
 def blur(a, r):
@@ -121,7 +131,16 @@ for m in mats:
     p90 = np.percentile(rgb.mean(-1), 90)
     if p90 > TARGET_P90:
         rgb = rgb * (TARGET_P90 / p90)
-    gloss = (1 - rough) * (0.38 + 0.30 * metal) * np.clip(shade, 0.6, 1.1)
+    # gloss keeps the cavity modulation it was calibrated with (GLOSS_CAVITY), so the softer
+    # CAVITY_GAIN changes the diffuse only: gloss already matches Bluedog
+    gshade = 1 + GLOSS_CAVITY * np.where(cav < 0, cav, cav * 0.35)
+    gloss = (1 - rough) * (0.38 + 0.30 * metal) * np.clip(gshade, 0.6, 1.1)
+    # Bluedog-style look pass, the same core bdb_look.py applies to the committed DDS
+    emit = next((bdb_look.read_dds(p)[..., :3] for p in (os.path.join(d, f'{m}_emit.dds') for d in EMIT_DIRS)
+                 if os.path.exists(p)), None)
+    rgb, info = bdb_look.look(np.clip(rgb, 0, 1), nx, ny, M if m in MASKS else None, emit)
+    nx, ny, nsc = bdb_look.scale_normal(nx, ny, NORMAL_STD)
+    nz = np.sqrt(np.clip(1 - nx * nx - ny * ny, 0, 1))
     diff = np.dstack([np.clip(rgb, 0, 1), np.clip(gloss, 0, 1)])
     to_dds(Image.fromarray((diff * 255 + 0.5).astype(np.uint8), 'RGBA'), f'{m}_diff')
 
@@ -130,7 +149,8 @@ for m in mats:
     to_dds(Image.fromarray((n * 255 + 0.5).astype(np.uint8), 'RGBA'), f'{m}_nrm')
     # previews for inspection
     Image.fromarray((np.dstack([nx * 0.5 + 0.5, ny * 0.5 + 0.5, nz]) * 255).astype(np.uint8)).save(os.path.join(tmp, f'{m}_nrm_preview.png'))
-    print(f'converted {m}: diffuse p90 {np.percentile(diff[...,:3].mean(-1),90):.2f}, gloss mean {diff[...,3].mean():.2f}, cavity range {shade.min():.2f}..{shade.max():.2f}')
+    print(f'converted {m}: diffuse p90 {np.percentile(diff[...,:3].mean(-1),90):.2f}, gloss mean {diff[...,3].mean():.2f}, cavity range {shade.min():.2f}..{shade.max():.2f}, '
+          f'look: relief kept {info["g"]:.2f}, crease {info["crease"]:.3f}, normals x{nsc:.2f}' + (', emissive masked' if emit is not None else ''))
 
 # Shared mounting-plate texture for the flat faces left where docking ports were removed.
 S = 512
