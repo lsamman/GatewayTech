@@ -7,9 +7,11 @@ ModuleColorChanger (_EmissiveColor, default 0,0,0) switches them on in game.
 gt_lib.material() gives a material the emissive shader when <tex>_emit.dds exists here.
 usage: python3 -I emit.py <tex_src dir> <out dir>
 """
-import os, subprocess, sys
+import os, sys
 import numpy as np
 from PIL import Image
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import bdb_look
 
 src, out = sys.argv[1], sys.argv[2]
 os.makedirs(out, exist_ok=True)
@@ -20,12 +22,15 @@ WARM = np.array([255, 244, 224], np.uint8)
 MIN_TEXELS = 16          # fewer than this: no emit map, material keeps the plain shader
 
 
-def to_dds(img, name):
+UVDUMP = os.path.join(os.path.dirname(os.path.abspath(src)), 'uvdump.json')
+
+
+def to_dds(img, name, cover=None):
     png = os.path.join(tmp, name + '.png')
     img.save(png)
-    # same conventions as textures.py: flip for KSP, full mip chain; DXT1 (no alpha needed)
-    subprocess.run(['magick', png, '-flip', '-define', 'dds:compression=dxt1',
-                    '-define', 'dds:cluster-fit=true', os.path.join(out, name + '.dds')], check=True)
+    # same conventions as textures.py: flip for KSP, full mip chain with the gutters padded out
+    # from the UV islands (bdb_look.write_dds); DXT1 (no alpha needed)
+    bdb_look.write_dds(np.asarray(img), os.path.join(out, name + '.dds'), cover, compression='dxt1')
 
 
 def load(name):
@@ -52,5 +57,6 @@ for m in MATS:
         continue
     img = np.zeros(base.shape[:2] + (3,), np.uint8)
     img[glass] = WARM
-    to_dds(Image.fromarray(img, 'RGB'), f'{m}_emit')
+    cover = bdb_look.coverage_mask(UVDUMP, m, img.shape[0]) if os.path.exists(UVDUMP) else None
+    to_dds(Image.fromarray(img, 'RGB'), f'{m}_emit', cover)
     print(f'{m}: {n} window texels -> {m}_emit.dds')

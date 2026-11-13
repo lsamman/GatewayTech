@@ -72,13 +72,77 @@ def _encoder():
     raise SystemExit('ImageMagick (magick / convert) not found')
 
 
-def write_dds(arr, path):
-    """uint8 RGBA (PNG orientation) -> DXT5 DDS, flipped for KSP, full mip chain."""
+def pad_gutters(a, cover, radius=32):
+    """Fill the texels outside the UV islands (cover False) from the nearest covered texels, so
+    mips never blend neighbouring islands or gutter filler into an island's edge: `radius`
+    one-texel rings averaged from covered/filled neighbours, then a push-pull fill of the rest.
+    a: float (H, W, C); returns a new array (covered texels unchanged)."""
+    a = a.astype(np.float32).copy()
+    known = np.asarray(cover, bool).copy()
+    if known.all() or not known.any():
+        return a
+    a[~known] = 0
+    for _ in range(radius):
+        kp = np.pad(known, 1).astype(np.float32); ap = np.pad(a * known[..., None], ((1, 1), (1, 1), (0, 0)))
+        h, w = known.shape
+        cnt = sum(kp[1 + dy:h + 1 + dy, 1 + dx:w + 1 + dx] for dy in (-1, 0, 1) for dx in (-1, 0, 1))
+        tot = sum(ap[1 + dy:h + 1 + dy, 1 + dx:w + 1 + dx] for dy in (-1, 0, 1) for dx in (-1, 0, 1))
+        new = ~known & (cnt > 0)
+        if not new.any():
+            break
+        a[new] = tot[new] / cnt[new][:, None]
+        known |= new
+    if not known.all():                            # push-pull: coarser levels fill what is left
+        lv = [(a * known[..., None], known.astype(np.float32))]
+        while min(lv[-1][1].shape) > 1:
+            v, k = lv[-1]
+            h2, w2 = k.shape[0] // 2, k.shape[1] // 2
+            v = v[:h2 * 2, :w2 * 2].reshape(h2, 2, w2, 2, -1).sum((1, 3))
+            k = k[:h2 * 2, :w2 * 2].reshape(h2, 2, w2, 2).sum((1, 3))
+            lv.append((v, k))
+        fill = lv[-1][0] / np.maximum(lv[-1][1], 1e-6)[..., None]
+        for v, k in reversed(lv[:-1]):
+            up = np.repeat(np.repeat(fill, 2, 0), 2, 1)
+            up = np.pad(up, ((0, k.shape[0] - up.shape[0]), (0, k.shape[1] - up.shape[1]), (0, 0)), mode='edge')
+            fill = np.where((k > 0)[..., None], v / np.maximum(k, 1e-6)[..., None], up)
+        a[~known] = fill[~known]
+    return a
+
+
+def mip_chain(a):
+    """Box-filtered mip levels of a float (H, W, C) image, every channel on its own (straight,
+    not alpha-weighted: ImageMagick's own chain premultiplies by alpha, which here is gloss or
+    normal X, and turns every zero-gloss texel black from mip 1 on)."""
+    out = [a]
+    while max(a.shape[:2]) > 1:
+        h, w = max(a.shape[0] // 2, 1), max(a.shape[1] // 2, 1)
+        b = a
+        if b.shape[0] > 1:
+            b = (b[0:h * 2:2] + b[1:h * 2:2]) / 2
+        if b.shape[1] > 1:
+            b = (b[:, 0:w * 2:2] + b[:, 1:w * 2:2]) / 2
+        a = b; out.append(a)
+    return out
+
+
+def write_dds(arr, path, cover=None, compression='dxt5'):
+    """uint8 RGBA/RGB (PNG orientation) -> DDS (DXT5 default), flipped for KSP, full mip chain built
+    here (straight box filter, see mip_chain) after padding the gutters from the islands when a
+    coverage mask is given."""
+    f = arr.astype(np.float32)
+    if cover is not None:
+        if cover.shape != f.shape[:2]:
+            cover = np.asarray(Image.fromarray(to_u8(cover)).resize(f.shape[1::-1]), np.float32) / 255
+        f = pad_gutters(f, cover > .5)
+    mode = 'RGBA' if f.shape[2] == 4 else 'RGB'
     with tempfile.TemporaryDirectory() as td:
-        png = os.path.join(td, 'in.png')
-        Image.fromarray(arr, 'RGBA').save(png, compress_level=1)
-        subprocess.run([_encoder(), png, '-flip', '-define', 'dds:compression=dxt5',
-                        '-define', 'dds:cluster-fit=true', path], check=True)   # default: full mip chain
+        files = []
+        for k, lv in enumerate(mip_chain(f)):
+            png = os.path.join(td, f'm{k:02d}.png')
+            Image.fromarray(np.ascontiguousarray((np.clip(lv, 0, 255) + .5).astype(np.uint8)[::-1]), mode).save(png, compress_level=1)
+            files.append(png)
+        subprocess.run([_encoder(), *files, '-define', f'dds:compression={compression}',
+                        '-define', 'dds:cluster-fit=true', '-define', 'dds:mipmaps=fromlist', path], check=True)
 
 
 def dds_mips(path):
@@ -239,6 +303,23 @@ def fbm_noise(h, w, seed, wrap):
     return n / (np.percentile(np.abs(n), 99) + 1e-9)
 
 
+def edge_gate(M, thin=24, soft=8):
+    """1 inside islands at least `thin` texels across, easing to 0 on thinner ones (greeble
+    islands): local island width = 2 x the largest inset distance within thin/2 texels."""
+    r = thin // 2
+    inside = M > .5
+    d = np.zeros(M.shape, np.float32); cur = inside.copy()
+    for _ in range(r):                             # chessboard inset distance, capped at r
+        p = np.pad(cur, 1)
+        cur = cur & p[:-2, 1:-1] & p[2:, 1:-1] & p[1:-1, :-2] & p[1:-1, 2:]
+        d += cur
+    t = d
+    for _ in range(r):                             # running max over a (2r+1)^2 window
+        p = np.pad(t, 1, mode='edge')
+        t = np.maximum.reduce([p[1:-1, 1:-1], p[:-2, 1:-1], p[2:, 1:-1], p[1:-1, :-2], p[1:-1, 2:]])
+    return np.clip((2 * t + 1 - (thin - soft)) / soft, 0, 1).astype(np.float32)
+
+
 # --- the look -------------------------------------------------------------------------------
 def scale_normal(nx, ny, target_std):
     """Scale tangent X/Y so the DXT5nm A channel (= nx/2 + .5) has std <= target_std."""
@@ -249,7 +330,7 @@ def scale_normal(nx, ny, target_std):
 
 def look(rgb, nx=None, ny=None, cover=None, emit=None, crease=-.05, occ=.12, isl=.06,
          grime=.04, edge=.02, wrap=False, seed=1, verbose=False, base_r=16.0, spread_r=24.0, core=.45, floor=.35,
-         measure_cover=False, contact_max=.15, p10_slack=0.0):
+         measure_cover=False, contact_max=.15, p10_slack=0.0, thin=24):
     """rgb (H, W, 3) float -> processed rgb. Returns (rgb, info)."""
     h, w = rgb.shape[:2]
     S = 1.0                                        # radii in texels, as the targets are measured
@@ -297,9 +378,10 @@ def look(rgb, nx=None, ny=None, cover=None, emit=None, crease=-.05, occ=.12, isl
     c /= np.percentile(np.abs(c[M > .5]), 98) + 1e-9
     c = np.clip(c, -1, 1)
     sh = 1 - occ * np.clip(-c, 0, 1) * (Ps + .5 * (1 - Ps)) * E * M
+    G = edge_gate(M, thin) if cover is not None else 1.0   # 0 on islands thinner than `thin` px
     if cover is not None:                          # UV-island-edge darkening (soft, both sides of seams)
         inner = blur(M, 10 * S, wrap)
-        sh *= 1 - isl * np.clip(1 - inner, 0, .5) * 2 * E * M
+        sh *= 1 - isl * np.clip(1 - inner, 0, .5) * 2 * E * M * G
         fade = np.clip(blur(M, 16 * S, wrap) * 2 - 1, 0, 1) ** 2  # no noise steps across seams
     else:
         fade = 1.0
@@ -313,7 +395,7 @@ def look(rgb, nx=None, ny=None, cover=None, emit=None, crease=-.05, occ=.12, isl
     #    up to `contact_max`
     cs = np.clip(blur(curv, 3 * S, wrap) / (np.percentile(np.abs(blur(curv, 3 * S, wrap)[M > .5]), 98) + 1e-9), -1, 0) * -1
     if cover is not None:
-        cs = np.maximum(cs, np.clip(1 - blur(M, 5 * S, wrap), 0, .5) * 2)
+        cs = np.maximum(cs, np.clip(1 - blur(M, 5 * S, wrap), 0, .5) * 2 * G)
     cs *= E * M
 
     def build(g, kc=0.0):
@@ -387,7 +469,7 @@ def process(diff_path, out_dir, nstd=None, uvdump=None, uvmat=None, emit_path=No
     os.makedirs(out_dir, exist_ok=True)
     od = os.path.join(out_dir, f'{name}_diff.dds')
     u8 = to_u8(np.dstack([rgb, d[..., 3]]))                 # gloss alpha passes through
-    write_dds(u8, od)
+    write_dds(u8, od, cover)
     back = read_dds(od); pre = u8.astype(np.float32) / 255
     print('  DXT5 encode of the new diffuse: RGB PSNR %.2f dB, mean |d| %.3f/255; alpha max |d| %d/255'
           % (psnr(pre[..., :3], back[..., :3]), np.abs(pre[..., :3] - back[..., :3]).mean() * 255,
@@ -396,7 +478,7 @@ def process(diff_path, out_dir, nstd=None, uvdump=None, uvmat=None, emit_path=No
         nx2, ny2, s = scale_normal(nx, ny, nstd)
         n = np.empty_like(nr)
         n[..., 0] = 1; n[..., 1] = ny2 * .5 + .5; n[..., 2] = n[..., 1]; n[..., 3] = nx2 * .5 + .5
-        on = os.path.join(out_dir, f'{name}_nrm.dds'); nu = to_u8(n); write_dds(nu, on)
+        on = os.path.join(out_dir, f'{name}_nrm.dds'); nu = to_u8(n); write_dds(nu, on, cover)
         back = read_dds(on); pre = nu.astype(np.float32) / 255
         print(f'  normal X/Y x{s:.3f}; DXT5 encode G,A PSNR %.2f dB, mean |d| %.3f/255'
               % (psnr(pre[..., [1, 3]], back[..., [1, 3]]), np.abs(pre[..., [1, 3]] - back[..., [1, 3]]).mean() * 255))
