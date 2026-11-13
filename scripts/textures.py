@@ -7,7 +7,7 @@ A-channel std of NORMAL_STD, relief softened to the crease target, broad occlusi
 texels lit in <mat>_emit.dds (out dir, else build/tex) are left alone.
 usage: python3 -I textures.py <tex_src dir> <out dir> [mat ...]     (mats: default all)
 """
-import os, subprocess, sys
+import os, sys
 import numpy as np
 from PIL import Image, ImageDraw
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -18,13 +18,13 @@ ONLY = set(sys.argv[3:])
 os.makedirs(out, exist_ok=True)
 tmp = os.path.join(out, '_png'); os.makedirs(tmp, exist_ok=True)
 
-def to_dds(img, name):
+def to_dds(img, name, cover=None):
     png = os.path.join(tmp, name + '.png')
     img.save(png)
-    # KSP reads DDS bottom-up relative to PNG, so flip; generate full mip chain
-    subprocess.run(['magick', png, '-flip', '-define', 'dds:compression=dxt5',
-                    '-define', 'dds:cluster-fit=true',
-                    os.path.join(out, name + '.dds')], check=True)
+    # KSP reads DDS bottom-up relative to PNG, so flip; full mip chain built by bdb_look.write_dds
+    # (straight box filter: ImageMagick's own weights colour by alpha = gloss / normal X), after
+    # the gutters are padded out from the UV islands (`cover`) so mips 2-4 keep island colours
+    bdb_look.write_dds(np.asarray(img.convert('RGBA')), os.path.join(out, name + '.dds'), cover)
 
 def load(name):
     p = os.path.join(src, name + '.png')
@@ -40,6 +40,7 @@ DETAIL_GAIN = 1.1      # relief derived from the colour map (panel seams, rivets
 CAVITY_GAIN = 0.20     # darken grooves / lighten edges from normal-map curvature
 GLOSS_CAVITY = 0.30    # the same curvature's pull on gloss (the pre-Bluedog CAVITY_GAIN, unchanged)
 NORMAL_STD = 0.10      # DXT5nm A-channel std after the look pass (Bluedog .09-.11)
+NORMAL_MAX_UP = 1.6    # maps whose own relief is softer are scaled up to NORMAL_STD, at most this much
 UVDUMP = os.path.join(os.path.dirname(os.path.abspath(sys.argv[1])), 'uvdump.json')
 EMIT_DIRS = (out, os.path.join(os.path.dirname(os.path.abspath(sys.argv[1])), 'tex'))
 
@@ -135,14 +136,21 @@ for m in mats:
     # CAVITY_GAIN changes the diffuse only: gloss already matches Bluedog
     gshade = 1 + GLOSS_CAVITY * np.where(cav < 0, cav, cav * 0.35)
     gloss = (1 - rough) * (0.38 + 0.30 * metal) * np.clip(gshade, 0.6, 1.1)
+    # gutters take the nearest island texels (colour, gloss, normal) before the look pass, so its
+    # targets are solved on what ships and mips 2-4 never blend gutter filler into the islands
+    PAD = M if m in MASKS else None
+    if PAD is not None:
+        g = bdb_look.pad_gutters(np.dstack([rgb, gloss, nx, ny]), PAD > .5)
+        rgb, gloss, nx, ny = g[..., :3], g[..., 3], g[..., 4], g[..., 5]
     # Bluedog-style look pass, the same core bdb_look.py applies to the committed DDS
     emit = next((bdb_look.read_dds(p)[..., :3] for p in (os.path.join(d, f'{m}_emit.dds') for d in EMIT_DIRS)
                  if os.path.exists(p)), None)
     rgb, info = bdb_look.look(np.clip(rgb, 0, 1), nx, ny, M if m in MASKS else None, emit)
-    nx, ny, nsc = bdb_look.scale_normal(nx, ny, NORMAL_STD)
+    nsc = float(np.clip(NORMAL_STD / max(float((nx * .5).std()), 1e-6), 0, NORMAL_MAX_UP))
+    nx = nx * nsc; ny = ny * nsc                        # A-channel std onto NORMAL_STD (up or down)
     nz = np.sqrt(np.clip(1 - nx * nx - ny * ny, 0, 1))
     diff = np.dstack([np.clip(rgb, 0, 1), np.clip(gloss, 0, 1)])
-    to_dds(Image.fromarray((diff * 255 + 0.5).astype(np.uint8), 'RGBA'), f'{m}_diff')
+    to_dds(Image.fromarray((diff * 255 + 0.5).astype(np.uint8), 'RGBA'), f'{m}_diff')   # padded above
 
     n = np.empty(base.shape[:2] + (4,), np.float32)
     n[..., 0] = 1; n[..., 1] = ny * 0.5 + 0.5; n[..., 2] = n[..., 1]; n[..., 3] = nx * 0.5 + 0.5
