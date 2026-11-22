@@ -28,8 +28,21 @@ Kerbal Space Program 1.12.x parts for building NASA's Lunar Gateway station, in 
 ## Requirements
 
 - KSP 1.12.x
+- ModuleManager
 - **HabTech2** by Benjee10. The crewed modules use its IVAs.
 - **Benjee10_sharedAssets** (recommended). Its `B10_NDS` / `B10_NDS_passive` ports sit exactly in GatewayTech's recessed seats.
+
+### Optional
+
+Each of these is a `:NEEDS[]` patch in `GameData/GatewayTech/Compatibility/` and does nothing when the mod is absent.
+
+- **ConnectedLivingSpace**: crew can walk through HALO, I-Hab, ESPRIT and the Airlock (arm and radiator mounts are not passages).
+- **Community Tech Tree**: parts move onto CTT nodes.
+- **SystemHeat**: the radiator wings become SystemHeat radiators.
+- **Waterfall**: ion plumes on the PPE's seven thrusters.
+- **USI Life Support**, **TAC Life Support**, **Snacks!**: supplies sized to each module's crew capacity.
+- **KSPRescuePodFix**: the crewed modules can be rescue-contract pods.
+- **VAB Organizer**: parts sorted into subcategories.
 
 ## Installation
 
